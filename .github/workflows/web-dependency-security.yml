@@ -1,0 +1,39 @@
+name: Web dependency security
+on:
+  push:
+    paths:
+      - 'web/package.json'
+      - 'web/package-lock.json'
+      - '.github/workflows/web-dependency-security.yml'
+  pull_request:
+    paths:
+      - 'web/package.json'
+      - 'web/package-lock.json'
+      - '.github/workflows/web-dependency-security.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '15 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  dependencies:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Validate reproducible npm lockfile
+        run: npm ci --ignore-scripts --no-audit
+      - name: Verify patched SDK is locked
+        run: |
+          node -e "const v=require('./node_modules/@modelcontextprotocol/sdk/package.json').version; if (Number(v.split('.')[0])!==1 || Number(v.split('.')[1])<32) process.exit(1); console.log('MCP SDK:',v)"
+      - name: Audit production dependency tree
+        run: npm audit --omit=dev --audit-level=high
